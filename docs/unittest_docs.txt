@@ -1,0 +1,388 @@
+                            Estrutura mínima de projeto
+
+seu_projeto/
+  __init__.py
+  pacote/
+    __init__.py
+    core.py
+  tests/
+    __init__.py
+    test_core.py
+
+. Nomeie os testes como test_*.py e classes como TestAlgo.
+
+. Um teste é um método começando com test_.
+
+                    Rodando testes (CLI do unittest)
+
+# todos os testes (descoberta automática)
+python -m unittest
+
+# modo verboso
+python -m unittest -v
+
+# descoberta em pasta e padrão de nome
+python -m unittest discover -v -s tests -p "test_*.py"
+
+# arquivo/classe/método específico
+python -m unittest tests.test_core
+python -m unittest tests.test_core.TestCore
+python -m unittest tests.test_core.TestCore.test_soma
+
+Opções úteis:
+
+    -v verbose, -q quiet
+
+    -f failfast (para no 1º erro)
+
+    -c catch (Ctrl+C = reporta e continua)
+
+    -b buffer (captura stdout/stderr)
+
+Escrevendo testes: TestCase + asserts:
+
+    # tests/test_core.py
+    import unittest
+    from pacote.core import soma
+
+    class TestSoma(unittest.TestCase):
+        def test_soma_basica(self):
+            self.assertEqual(soma(2, 3), 5)
+
+        def test_soma_negativos(self):
+            self.assertEqual(soma(-1, -2), -3)
+
+Principais asserts (todos herdam de unittest.TestCase):
+
+    assertEqual(a, b), assertNotEqual(a, b)
+
+    assertTrue(x), assertFalse(x)
+
+    assertIs(a, b), assertIsNot(a, b)
+
+    assertIsNone(x), assertIsNotNone(x)
+
+    assertIn(membro, container), assertNotIn(...)
+
+    assertAlmostEqual(a, b, places=7, delta=None)
+
+    assertRaises(Exc, func, *args, **kwargs) ou como context manager:
+
+        with self.assertRaises(ValueError):
+            int("x")
+
+    assertRaisesRegex(Exc, r"msg")
+
+    assertWarns(Warning), assertWarnsRegex(...)
+
+    assertLogs(logger=None, level=None) (captura logs)
+
+    assertRegex(texto, r"padrao"), assertNotRegex(...)
+
+    assertCountEqual(a, b) (ignora ordem; compara multiconjuntos)
+
+    assertDictEqual, assertListEqual, assertSetEqual
+
+Dica: para comparar floats, prefira assertAlmostEqual/delta.
+
+                    Fixtures (ciclo de vida do teste)
+
+class Teste(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # roda 1x antes de todos os testes da classe
+        pass
+
+    def setUp(self):
+        # roda antes de CADA teste
+        self.tmp = []
+
+    def tearDown(self):
+        # roda depois de cada teste
+        self.tmp.clear()
+
+    @classmethod
+    def tearDownClass(cls):
+        # roda 1x depois de todos os testes da classe
+        pass
+
+Extras:
+
+    addCleanup(func, *args, **kwargs) → registra limpezas para este teste (executa mesmo se 
+    falhar).
+
+    setUpModule/tearDownModule (no arquivo inteiro).
+
+                    Parametrização leve com subTest
+
+class TestTabuada(unittest.TestCase):
+    def test_tabuada(self):
+        casos = [(2, 3, 6), (5, 5, 25), (10, 0, 0)]
+        for a, b, esperado in casos:
+            with self.subTest(a=a, b=b):
+                self.assertEqual(a*b, esperado)
+
+                    Ignorando e marcando testes
+
+import unittest, sys
+
+@unittest.skip("pulado temporariamente")
+class TestLento(unittest.TestCase):
+    ...
+
+class Teste(unittest.TestCase):
+    @unittest.skipIf(sys.platform.startswith("win"), "depende de epoll")
+    def test_so_no_linux(self):
+        ...
+
+    @unittest.expectedFailure
+    def test_bug_conhecido(self):
+        self.assertEqual(1/0, 1)  # vai falhar, mas não quebra o suite
+
+
+Também há self.skipTest("motivo") dentro do teste.
+
+                    Testes assíncronos (3.8+)
+
+import asyncio, unittest
+
+class TestAsync(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.val = 2
+
+    async def test_async(self):
+        await asyncio.sleep(0)
+        self.assertEqual(self.val * 3, 6)
+
+    async def asyncTearDown(self):
+        ...
+
+                    unittest.mock — o coração do mocking
+
+from unittest import mock
+# ou:
+from unittest.mock import Mock, MagicMock, patch, call, ANY, sentinel, create_autospec
+
+Mock básico:
+
+    m = Mock()
+    m.algo.return_value = 42
+    assert m.algo() == 42
+    m.algo.assert_called_once()
+
+MagicMock:
+
+    Como Mock, mas implementa “métodos mágicos” (__len__, __iter__, etc.). Útil para objetos 
+    que serão iterados, comparados, usados com with, etc.
+
+patch — substituição por nome no local onde é usado:
+
+    # em pacote/core.py
+    import requests
+    def baixa(url):
+        r = requests.get(url, timeout=5)
+        return r.status_code
+
+    # teste
+    @mock.patch("pacote.core.requests.get")
+    def test_baixa_ok(mock_get):
+        mock_get.return_value.status_code = 200
+        from pacote.core import baixa
+        assert baixa("http://x") == 200
+        mock_get.assert_called_once_with("http://x", timeout=5)
+
+Regra de ouro: “patch onde é importado”. Se core.py faz import requests, 
+você patch("pacote.core.requests.get") (e não "requests.get").
+
+Formas:
+
+    . Decorador: @patch("modulo.nome")
+
+    . Context manager: with patch("modulo.nome") as m: ...
+
+    . Início/fim manual (em setUp / addCleanup):
+    
+        self.patcher = patch(...); self.mock = self.patcher.start();
+        self.addCleanup(self.patcher.stop)
+
+autospec e create_autospec:
+
+    Garante assinatura/atributos corretos (ajuda a pegar erros de API do mock).
+
+        from unittest.mock import create_autospec
+
+        def api(a, b): ...
+            fake = create_autospec(api, return_value=10)
+            fake(1, 2)         # ok
+            # fake(1)          # TypeError: faltou arg
+
+    Com patch:
+
+        @patch("pacote.core.requests.get", autospec=True)
+        def test(...):
+            ...
+
+    spec_set=True impede criar atributos inexistentes.
+
+side_effect, return_value, sequência e exceções:
+
+    m = Mock()
+    m.calc.side_effect = [10, 20, RuntimeError("fim")]
+    assert m.calc() == 10
+    assert m.calc() == 20
+    with pytest.raises(RuntimeError):  # (ou unittest assertRaises)
+        m.calc()
+
+    # lançar exceção sempre:
+    m.fail.side_effect = ValueError("x")
+
+Espionar (spy) com wraps:
+
+    Executa a função real, mas mede/chama via mock.
+
+        def dobro(x): return x*2
+        spy = Mock(wraps=dobro)
+        assert spy(5) == 10
+        spy.assert_called_once_with(5)
+
+PropertyMock:
+
+    Para propriedades (@property):
+
+        from unittest.mock import patch, PropertyMock
+
+        class C:
+            @property
+            def valor(self): return 10
+
+        with patch.object(C, "valor", new_callable=PropertyMock) as pm:
+            pm.return_value = 99
+            assert C().valor == 99
+
+mock_open (I/O) e patch('builtins.open', ...):
+
+    from unittest.mock import mock_open, patch
+
+    dados = "linha1\nlinha2\n"
+    with patch("builtins.open", mock_open(read_data=dados)) as m:
+        with open("arquivo.txt") as f:
+            assert f.read() == dados
+        m.assert_called_once_with("arquivo.txt")
+
+patch.dict, ANY, sentinel, call:
+
+    from unittest.mock import patch, ANY, sentinel, call
+    import os
+
+    with patch.dict(os.environ, {"TOKEN": "abc"}, clear=False):
+        assert os.environ["TOKEN"] == "abc"
+
+    mock = Mock()
+    mock.req({"t": 1, "meta": object()})
+    mock.req.assert_called_once_with({"t": 1, "meta": ANY})
+
+    # sequência de chamadas:
+    mock = Mock()
+    mock.a(1); mock.a(2)
+    mock.a.assert_has_calls([call(1), call(2)])
+
+reset_mock, assert_not_called, call_args:
+
+    m = Mock()
+    m.x(1)
+    m.x.assert_called()
+    print(m.x.call_args)       # args/kwargs da última chamada
+    print(m.x.call_args_list)  # histórico
+    m.reset_mock()
+    m.x.assert_not_called()
+
+AsyncMock (3.8+):
+
+    from unittest.mock import AsyncMock, patch
+
+    @patch("pacote.core.fetch", new_callable=AsyncMock)
+    async def test_fetch(mock_fetch):
+        mock_fetch.return_value = {"ok": True}
+        res = await pacote.core.fetch("url")
+        assert res["ok"] is True
+
+            Testes de integração leves (fs/rede) sem libs externas
+
+. Filesystem: tempfile.TemporaryDirectory()/NamedTemporaryFile() em setUp + addCleanup.
+
+. Rede: evite bater na internet; use patch no cliente 
+(requests.get, aiohttp.ClientSession.get etc.).
+
+                Suites, Loader e Runner (montagem manual)
+
+import unittest
+from tests import test_core, test_outro
+
+def suite():
+    loader = unittest.TestLoader()
+    s = unittest.TestSuite()
+    s.addTests(loader.loadTestsFromModule(test_core))
+    s.addTests(loader.loadTestsFromModule(test_outro))
+    return s
+
+if __name__ == "__main__":
+    runner = unittest.TextTestRunner(verbosity=2)
+    runner.run(suite())
+
+Você também pode usar defaultTestLoader.discover("tests").
+
+                            Boas práticas
+
+. Teste por comportamento/contrato, não por implementação.
+
+. Um teste = arrange (prepara) → act (executa) → assert (verifica).
+
+. Independentes e determinísticos (sem hora/aleatório/rede real).
+
+. Mocks com parcimônia; prefira autospec.
+
+. Use subTest para parametrizar cases simples.
+
+. Mensagens claras ao falhar (às vezes é melhor assertEqual(msg_esperada, msg_real)).
+
+. Não engula exceções em código produtivo só para “fazer passar teste”.
+
+. Cubra caminhos de erro (use assertRaises, assertWarns).
+
+. Integre no CI. Para cobertura, use coverage.py (externo ao unittest).
+
+                    Exemplos “de bolso” (copiáveis)
+
+Patch onde é importado:
+
+    @patch("app.servico.requests.get", autospec=True)
+    def test_busca_ok(get):
+        get.return_value.json.return_value = {"ok": 1}
+        assert busca() == {"ok": 1}
+
+addCleanup para parar patchers:
+
+    class Teste(unittest.TestCase):
+        def setUp(self):
+            p = patch("app.mod.recurso")
+            self.mock = p.start()
+            self.addCleanup(p.stop)
+
+subTest tabela:
+
+    for entrada, esperado in [(2,4),(3,9),(4,16)]:
+        with self.subTest(entrada=entrada):
+            self.assertEqual(quadrado(entrada), esperado)
+
+assertLogs:
+
+    with self.assertLogs("app", level="INFO") as cm:
+        faz_algo()
+    self.assertIn("app:INFO:feito", cm.output[0])
+
+AsyncMock:
+
+    @patch("app.api.fetch", new_callable=AsyncMock)
+    async def test_fetch_ok(mock_fetch):
+        mock_fetch.return_value = {"ok": True}
+        self.assertTrue((await app.api.fetch("u"))["ok"])

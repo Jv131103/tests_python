@@ -1,0 +1,193 @@
+Framework embutido no Python que executa exemplos interativos (como no REPL) dentro de 
+docstrings ou arquivos de texto e verifica se a saída bate exatamente.
+
+    . Onde procura: docstrings de módulos, funções, métodos, classes e no dicionário 
+    especial __test__.
+
+    . Estilo dos exemplos: prompts >>> e continuação ....
+
+Seu primeiro doctest:
+
+    def soma(a, b):
+        """
+        Soma dois números.
+
+        >>> soma(2, 3)
+        5
+        >>> soma(-1, 1)
+        0
+        """
+        return a + b
+
+Rodando rápido no módulo:
+
+    if __name__ == "__main__":
+        import doctest
+        doctest.testmod()               # roda doctests encontrados no módulo
+
+
+Pelo terminal (verboooooose):
+
+    python -m doctest -v seu_modulo.py
+
+
+Comparação de saída: como o doctest “pensa”:
+
+    . Ele executa a linha >>> e compara a saída textual com as linhas subsequentes.
+
+    . Para expressões, compara o repr que o REPL imprimiria.
+
+    . Para statements (ex.: print, for, if), compara o que foi impresso em stdout.
+
+    Se sua função retorna mas não imprime, octest não vê nada — então:
+
+    . ou use print(...) nos exemplos,
+
+    . ou mostre o valor (deixe a expressão “solta” para o REPL imprimir o repr).
+
+Exceções em doctest:
+
+    def to_int(x):
+        """
+        Converte para int.
+
+        >>> to_int("a")
+        Traceback (most recent call last):
+        ...
+        ValueError: invalid literal for int() with base 10: 'a'
+        """
+        return int(x)
+
+    Use ... para pular linhas do traceback (requer flag ELLIPSIS, veja abaixo).
+
+Diretrizes/flags mais úteis (optionflags):
+
+    Você pode ativá-las globalmente (em testmod/testfile) ou linha a linha com # doctest: 
+    +FLAG1, +FLAG2.
+
+    . ELLIPSIS – ... vira curinga na saída esperada.
+    Ex.: Lista(..., 42, ...)
+
+    . NORMALIZE_WHITESPACE – ignora variações de espaços/brancos.
+
+    . IGNORE_EXCEPTION_DETAIL – só confere tipo e mensagem da exceção, ignorando detalhes do 
+    ambiente.
+
+    . REPORT_NDIFF/REPORT_UDIFF/REPORT_CDIFF – mostram diffs quando falha.
+
+    . FAIL_FAST – para no primeiro erro.
+
+    . +SKIP – pula aquele exemplo específico.
+
+Exemplo inline:
+
+    >>> print("a   b")  # doctest: +NORMALIZE_WHITESPACE
+    a b
+
+Exemplo com “curinga”:
+
+    >>> gerar_token()
+    'tkn-...'
+
+Ativando globalmente:
+
+    import doctest
+    doctest.testmod(optionflags=doctest.ELLIPSIS | doctest.NORMALIZE_WHITESPACE)
+
+Arquivos externos (README, tutoriais):
+
+    python -m doctest -v README.rst
+
+Ou no código:
+
+    import doctest
+    doctest.testfile("README.rst", encoding="utf-8",
+                    optionflags=doctest.ELLIPSIS)
+
+Com setup/teardown e múltiplos arquivos:
+
+    def _setup(test):
+        test.globs["PI"] = 3.14159
+
+    suite = doctest.DocFileSuite(
+        "README.rst", "USAGE.txt",
+        setUp=_setup,
+        optionflags=doctest.ELLIPSIS
+    )
+
+Integração com unittest (descoberta, CI):
+
+    # tests/test_doctest_suite.py
+    import unittest, doctest, seu_modulo
+
+    def load_tests(loader, tests, ignore):
+        tests.addTests(doctest.DocTestSuite(seu_modulo,
+                                            optionflags=doctest.ELLIPSIS))
+        tests.addTests(doctest.DocFileSuite("README.rst"))
+        return tests
+
+Agora python -m unittest já roda os doctests.
+
+Integração com pytest:
+
+    # roda doctests dos módulos e arquivos
+    pytest --doctest-modules --doctest-glob="*.rst" -q
+
+No pytest.ini:
+
+    [pytest]
+    addopts = --doctest-modules --doctest-glob="*.rst"
+
+__test__: doctests “extras”
+
+    __test__ = {
+        "casos_basicos": """
+        >>> soma(1, 2)
+        3
+        """
+    }
+
+O doctest coleta esses trechos (como se fossem docstrings nomeadas).
+
+Depurar e inspecionar:
+
+    Parar e interagir no exemplo que falhou:
+
+        import doctest
+        doctest.debug(seu_modulo)        # REPL no contexto do módulo
+
+    Executar docstring específica de um objeto:
+
+        doctest.run_docstring_examples(soma, globs=vars(seu_modulo), name="soma")
+
+    Ver fonte que o doctest “enxerga”:
+
+        print(doctest.testsource(seu_modulo, "soma"))
+
+Boas práticas e armadilhas:
+
+    . Seja determinístico
+
+        Evite hora atual, aleatoriedade e caminhos absolutos.
+
+        Se precisar, congele (seed), formate a saída ou use ELLIPSIS.
+
+    . Espaços e quebras
+
+        Para linhas em branco na saída, use o marcador <BLANKLINE>.
+
+        Ative NORMALIZE_WHITESPACE quando a estética não for crítica.
+
+    . Impressão vs retorno
+
+        O doctest checa o que é impresso. Mostre o valor (expr “solta”) ou use print.
+
+    . Mensagens de erro
+
+        Tracebacks variam por versão — use ... com ELLIPSIS ou IGNORE_EXCEPTION_DETAIL.
+
+    . Documente ensinando
+
+        Escreva exemplos didáticos: do simples ao complexo.
+
+
