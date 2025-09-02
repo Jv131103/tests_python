@@ -1,0 +1,124 @@
+                            assert em Python
+
+. assert = checagem em tempo de execução para validar suposições internas (invariantes, pré/pós‑condições).
+
+. Falha ⇒ AssertionError (com mensagem opcional).
+
+. Removível com python -O (não use para validação de entrada de usuário).
+
+                            Sintaxe
+
+Básico: 
+
+    assert condição
+
+Com mensagem: 
+
+    assert condição, "mensagem"
+
+Equivalente explícito: 
+
+    if __debug__ and not condição: 
+        raise AssertionError("mensagem")
+
+                                Semântica
+
+. Avalia condição; se False → lança AssertionError.
+
+. Mensagem pode ser qualquer objeto (vira AssertionError.args).
+
+. Evite efeitos colaterais e cálculos pesados dentro do assert.
+
+Otimização & __debug__:
+
+    . Executando com -O ou -OO: todas as instruções assert são removidas do bytecode.
+
+    . __debug__ é True por padrão; com -O, vira False.
+
+    . Implicação: não baseie lógica essencial em assert.
+
+                    Quando Usar (Design by Contract)
+
+. Pré‑condições: suposições sobre argumentos (entre funções controladas).
+
+. Pós‑condições: garantias após executar a função.
+
+. Invariantes: propriedades que devem sempre valer (estruturas/loops).
+
+. Desenvolvimento/Testes: detectar regressões cedo.
+
+Exemplos:
+
+# Pré‑condição
+def dividir(a, b):
+    assert b != 0, "divisor não pode ser zero"
+    return a / b
+
+
+# Pós‑condição
+def sorted_copy(xs):
+    ys = sorted(xs)
+    assert all(ys[i] <= ys[i+1] for i in range(len(ys)-1)), "não ordenou"
+    return ys
+
+
+# Invariante de laço
+saldo = 0
+for v in valores:
+    saldo += v
+    assert saldo >= 0, f"saldo negativo: {saldo}"
+
+                            Quando não usar
+
+. Validação de entrada de usuário ou dados externos.
+
+. Regras de negócio essenciais.
+
+. Checagens que devem existir em produção mesmo com -O.
+
+    Use if + raise (ex.: ValueError, TypeError) para validações reais.
+
+                    Mensagens Eficazes
+
+Diga o que falhou + valor(es) envolvido(s):
+
+    assert 0 <= p <= 1, f"p fora do [0,1]: {p}"
+
+Evite mensagens vagas ou montar strings caríssimas sem necessidade.
+
+                            Relação com Testes
+
+. pytest: usa assert puro com introspecção (diffs úteis).
+
+    def test_soma():
+        assert soma(2, 2) == 4
+
+. unittest: prefira métodos assert* (melhor relatório):
+
+    self.assertEqual(obtido, esperado)
+
+
+                            Armadilhas Comuns
+
+- assert atualizar_cache() (efeito colateral)
+ 
+- assert caro(x) sem necessidade (custo)
+ 
+- Usar como validação de produção
+ 
+- Mensagens com serialização pesada (ex.: json.dumps de objetos enormes)
+
+                        raise vs assert
+
+assert: conciso, removível, foco em contratos internos.
+
+raise: explícito, sempre ativo, foco em erros de domínio/entrada.
+
+    if x < 0:
+        raise ValueError("x negativo")
+
+                            Depuração
+
+Traceback mostra arquivo/linha/expressão.
+
+Combine com logs para contexto adicional.

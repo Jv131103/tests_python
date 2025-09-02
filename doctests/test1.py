@@ -30,7 +30,13 @@ def soma(x, y):
     (4+0j)
     >>> soma(-1, 1)
     0
+    >>> soma("10", 10)
+    Traceback (most recent call last):
+    ...
+    AssertionError: x precisa ser int, float ou complex
     """
-    if not isinstance(x, (int, float, complex)):
-        raise ValueError("Valor inválido: X e Y precisam ser do tipo numérico")
+    assert isinstance(x, (int, float, complex)), \
+        "x precisa ser int, float ou complex"
+    assert isinstance(x, (int, float, complex)), \
+        "y precisa ser int, float ou complex"
     return x + y
