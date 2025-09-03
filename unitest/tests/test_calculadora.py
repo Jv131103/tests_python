@@ -8,3 +8,6 @@ calculadora = importlib.import_module("unitest.pacote.calculadora")
 class TestCalculadora(unittest.TestCase):
     def test_soma(self):
         self.assertEqual(calculadora.soma(2, 3), 5)
+
+    def test_subtracao(self):
+        self.assertEqual(calculadora.subtracao(4, 3), 1)
